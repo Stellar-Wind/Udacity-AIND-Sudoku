@@ -1,96 +1,11 @@
-    # Dear code reviewers: I don't know what makes good comments. Could you please forward me some best practices?
-
-rows = 'ABCDEFGHI'
-cols = '123456789'
-
-assignments = []
-
-def assign_value(values, box, value):
-    """
-    Please use this function to update your values dictionary!
-    Assigns a value to a given box. If it updates the board record it.
-    """
-    values[box] = value
-    if len(value) == 1:
-        assignments.append(values.copy())
-    return values
-
-def cross(a, b):
-    "Cross product of elements in A and elements in B."
-    return [s+t for s in a for t in b]
-
-boxes = cross(rows, cols)
-
-row_units = [cross(r, cols) for r in rows]
-column_units = [cross(rows, c) for c in cols]
-
-square_units = [cross(rs, cs) for rs in ('ABC','DEF','GHI') for cs in ('123','456','789')]
-
-diagonal_unit1 = zip(rows,cols)
-for label_pair in range(len(diagonal_unit1)):
-	diagonal_unit1[label_pair] = diagonal_unit1[label_pair][0] + diagonal_unit1[label_pair][1]
+# Dear code reviewer:
+# Is there a more compact way to write the if statement code on line 38?
+# if box != naked_twin_1 and box != naked_twin_2 and (exclusion_value_0 in values[box] or exclusion_value_1 in values[box]):
 
 
-# Use Extended Slice syntax to reverse the 'rows' string.
-# https://docs.python.org/2/whatsnew/2.3.html#extended-slices
-# The diagonal unit from lower left to upper right (from I1 to A9).
-diagonal_unit2 = zip(rows[::-1],cols)
-for label_pair in range(len(diagonal_unit2)):
-	diagonal_unit2[label_pair] = diagonal_unit2[label_pair][0] + diagonal_unit2[label_pair][1]
-
-diagonal_units = []
-diagonal_units.append( diagonal_unit1 ) 
-diagonal_units.append( diagonal_unit2 ) 
-
-unitlist = row_units + column_units + square_units + diagonal_units
-
-units = dict((s, [u for u in unitlist if s in u]) for s in boxes)
-
-peers = dict((s, set(sum(units[s],[]))-set([s])) for s in boxes)
+from utils import *
 
 
-
-def display(values):
-    """
-    Display the values as a 2-D grid.
-    Args:
-        values(dict): The sudoku in dictionary form
-    """
-    width = 1+max(len(values[s]) for s in boxes)
-    line = '+'.join(['-'*(width*3)]*3)
-    for r in rows:
-        print(''.join(values[r+c].center(width)+('|' if c in '36' else '')
-                      for c in cols))
-        if r in 'CF': print(line)
-    return
-
-def eliminate(values):
-    solved_values = [box for box in values.keys() if len(values[box]) == 1]
-    for box in solved_values:
-        digit = values[box]
-        for peer in peers[box]:
-            values[peer] = values[peer].replace(digit,'')
-    return values
-
-def grid_values(grid):
-    """
-    Convert grid into a dict of {square: char} with '123456789' for empties.
-    Args:
-        grid(string) - A grid in string form.
-    Returns:
-        A grid in dictionary form
-            Keys: The boxes, e.g., 'A1'
-            Values: The value in each box, e.g., '8'. If the box has no value, then the value will be '123456789'.
-    """
-    chars = []
-    digits = '123456789'
-    for c in grid:
-        if c in digits:
-            chars.append(c)
-        if c == '.':
-            chars.append(digits)
-    assert len(chars) == 81
-    return dict(zip(boxes, chars))
 
 def naked_twins(values):
 #     """Eliminate values using the naked twins strategy.
@@ -108,18 +23,20 @@ def naked_twins(values):
                     naked_twin_1 = box
                     naked_twin_2 = peer
                     print("\n")
-                    print ("naked twins:",naked_twin_1,naked_twin_2)
+                    print ("naked twins in boxes",naked_twin_1,"and",naked_twin_2)
                     # print(values[box])
                     # print(peers[box])
                     # print(box,values[box],values[peer])
                     for unit in unitlist:
                         if naked_twin_1 in unit and naked_twin_2 in unit:
-                            exclusion_value_0 = values[naked_twin_1][0] # could also be values[naked_twin_2]
-                            exclusion_value_1 = values[naked_twin_2][1]
+                            exclusion_value_0 = values[naked_twin_1][0] # could also be values[naked_twin_2][0]
+                            exclusion_value_1 = values[naked_twin_2][1] # could also be values[naked_twin_1][1]
                             print('unit',unit)
                             print("exclusion_values",exclusion_value_0,",",exclusion_value_1)  
                             for box in unit:
-                                if box != naked_twin_1 and box != naked_twin_2:
+                                # if the box is not either of the naked twins, and contains either of the exclusion values...
+                                if box != naked_twin_1 and box != naked_twin_2 and (exclusion_value_0 in values[box] or exclusion_value_1 in values[box]):
+                                    # then remove the exclusion values from said box:
                                     print("BEFORE box = " + box, "value=" + values[box])
                                     values[box] = values[box].replace(exclusion_value_0, "")
                                     values[box] = values[box].replace(exclusion_value_1, "")
@@ -129,6 +46,7 @@ def naked_twins(values):
     return values
 
 def only_choice(values):
+    """Eliminate values using the 'only choice' strategy."""
     for unit in unitlist:
         for digit in '123456789':
             dplaces = [box for box in unit if digit in values[box]]
@@ -137,12 +55,14 @@ def only_choice(values):
     return values
 
 def reduce_puzzle(values):
+    """Eliminate values iteratively using all strategies."""
     solved_values = [box for box in values.keys() if len(values[box]) == 1]
     stalled = False
     while not stalled:
         solved_values_before = len([box for box in values.keys() if len(values[box]) == 1])
         values = eliminate(values)
         values = only_choice(values)
+        values = naked_twins(values)
         solved_values_after = len([box for box in values.keys() if len(values[box]) == 1])
         stalled = solved_values_before == solved_values_after
         if len([box for box in values.keys() if len(values[box]) == 0]):
@@ -150,6 +70,7 @@ def reduce_puzzle(values):
     return values
 
 def search(values):
+    """Eliminate values by searching the game tree."""
     # First, reduce the puzzle using the previous function
     values = reduce_puzzle(values)
     if values is False:
@@ -183,7 +104,6 @@ def solve(grid):
     while not stalled:
         solved_values_before = len([box for box in values.keys() if len(values[box]) == 1])
         values = reduce_puzzle(values)
-        values = naked_twins(values)
         solved_values_after = len([box for box in values.keys() if len(values[box]) == 1])
         stalled = solved_values_before == solved_values_after
         if len([box for box in values.keys() if len(values[box]) == 0]):
