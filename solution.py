@@ -1,8 +1,3 @@
-# Dear code reviewer:
-# Is there a more compact way to write the if statement code on line 38?
-# if box != naked_twin_1 and box != naked_twin_2 and (exclusion_value_0 in values[box] or exclusion_value_1 in values[box]):
-
-
 from utils import *
 
 
